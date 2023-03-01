@@ -47,6 +47,18 @@ class RequestCacheMiddleware implements MiddlewareInterface
     protected $ignoredQueryParams;
 
     /**
+     * @var boolean
+     * @Flow\InjectConfiguration(path="request.queryParams.ignoreAllExceptAllowed")
+     */
+    protected $ignoreAllExceptAllowedQueryParams;
+
+    /**
+     * @var array
+     * @Flow\InjectConfiguration(path="request.cookieParams.allow")
+     */
+    protected $allowedCookieParams;
+
+    /**
      * @var array
      * @Flow\InjectConfiguration(path="request.cookieParams.ignore")
      */
@@ -134,6 +146,7 @@ class RequestCacheMiddleware implements MiddlewareInterface
                     $allowedQueryParams[$key] = $value;
                     break;
                 case (in_array($key, $this->ignoredQueryParams)):
+                case $this->ignoreAllExceptAllowedQueryParams:
                     $ignoredQueryParams[$key] = $value;
                     break;
                 default:
@@ -146,15 +159,24 @@ class RequestCacheMiddleware implements MiddlewareInterface
         }
 
         $requestCookieParams = $request->getCookieParams();
-        $disallowedCookieParams = [];
-        foreach ($requestCookieParams as $key => $value) {
-            if (!in_array($key, $this->ignoredCookieParams)) {
-                $disallowedCookieParams[$key] = $value;
-            }
-        }
 
-        if (count($disallowedCookieParams) > 0) {
-            return null;
+        if (!empty($this->allowedCookieParams)) {
+            foreach ($this->allowedCookieParams as $key) {
+                if (array_key_exists($key, $requestCookieParams)) {
+                    return null;
+                }
+            }
+        } else {
+            $disallowedCookieParams = [];
+            foreach ($requestCookieParams as $key => $value) {
+                if (!in_array($key, $this->ignoredCookieParams)) {
+                    $disallowedCookieParams[$key] = $value;
+                }
+            }
+
+            if (count($disallowedCookieParams) > 0) {
+                return null;
+            }
         }
 
         return md5((string)$request->getUri()->withQuery(http_build_query($allowedQueryParams)));
